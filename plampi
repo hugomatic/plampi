@@ -8,7 +8,7 @@ import json
 
 import logging
 
-RELAIS_1_GPIO = 23
+RELAY_1_GPIO = 23
 
 debug_mode = False
 
@@ -33,11 +33,11 @@ def time_state(hour_on, min_on, hour_off, min_off):
     return True
 
 def relay1(state):
-    print(f'{datetime.datetime.now()}: relay 1 (pin {RELAIS_1_GPIO}): {state}') 
+    print(f'{datetime.datetime.now()}: relay 1 (pin {RELAY_1_GPIO}): {state}') 
     if state:
-        GPIO.output(RELAIS_1_GPIO, GPIO.HIGH)
+        GPIO.output(RELAY_1_GPIO, GPIO.HIGH)
     else:
-        GPIO.output(RELAIS_1_GPIO, GPIO.LOW)
+        GPIO.output(RELAY_1_GPIO, GPIO.LOW)
 
 
 if __name__ == "__main__":
@@ -50,7 +50,7 @@ start plampi {datetime.datetime.now()}
     """)
     
     GPIO.setmode(GPIO.BCM) # GPIO Numbers instead of board numbers
-    GPIO.setup(RELAIS_1_GPIO, GPIO.OUT) # GPIO Assign mode
+    GPIO.setup(RELAY_1_GPIO, GPIO.OUT) # GPIO Assign mode
 
        
     time.sleep(0.1)
