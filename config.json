@@ -1,0 +1,12 @@
+
+{
+    "sleep": 5,  
+    "relay1": {
+        "hour_on": 7,
+        "min_on": 0,
+        "hour_off": 21,
+        "min_off": 0
+    }
+}
+
+

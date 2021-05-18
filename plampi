@@ -4,40 +4,82 @@ import os
 import time
 import RPi.GPIO as GPIO
 import datetime
+import json
 
-def time_state():
-    now = datetime.datetime.now()
-    if now.hour > 6 and now.min > 0:
-        if now.hour < 19 and now.minute < 30:
-            # daytime!
-            return True
-    else:
-        return False
-    if now.hour > 19 and now.minute > 30:
-            return False
-    return False
-
-
-GPIO.setmode(GPIO.BCM) # GPIO Numbers instead of board numbers
+import logging
 
 RELAIS_1_GPIO = 23
+
+debug_mode = False
+
+def dbg(s):
+    global debug_mode
+    if debug_mode:
+        print(s)
+
+def time_state(hour_on, min_on, hour_off, min_off):
+    now = datetime.datetime.now()
+    dbg(f'now: {now}')
+    # too early?
+    if now.hour <= hour_on and now.minute < min_on:
+        dbg(f'before {hour_on}:{min_on}: ... too early')
+        return False
+    # too late?
+    if now.hour >= hour_off and now.minute > min_off:
+        dbg(f'after {hour_off}:{min_off} ... too late')
+        return False
+    # just right
+    dbg(f'between {hour_on}:{min_on} and {hour_off}:{min_off} ... daytime')
+    return True
+
 def relay1(state):
-    print(f'relay 1 (pin {RELAIS_1_GPIO}): {state}') 
+    print(f'{datetime.datetime.now()}: relay 1 (pin {RELAIS_1_GPIO}): {state}') 
     if state:
         GPIO.output(RELAIS_1_GPIO, GPIO.HIGH)
     else:
         GPIO.output(RELAIS_1_GPIO, GPIO.LOW)
 
-GPIO.setup(RELAIS_1_GPIO, GPIO.OUT) # GPIO Assign mode
 
-time.sleep(0.1)
-# show that it works
-relay1(True)
-time.sleep(1)
-relay1(False)
+if __name__ == "__main__":
+   
+    print(f"""
 
-relay1_state = False
-while True:
-  time.sleep(5)
-  relay1(relay1_state)
-  relay1_state = not relay1_state 
+======================================
+start plampi {datetime.datetime.now()}
+
+    """)
+    
+    GPIO.setmode(GPIO.BCM) # GPIO Numbers instead of board numbers
+    GPIO.setup(RELAIS_1_GPIO, GPIO.OUT) # GPIO Assign mode
+
+       
+    time.sleep(0.1)
+    # show that it works
+    relay1(True)
+    time.sleep(1)
+    relay1(False)
+
+    config_path = os.path.realpath('config.json')
+    print(f'reading config: {config_path}')
+    conf = None
+    with open(config_path, 'r') as f:
+        conf = json.load(f) 
+        print(conf)
+ 
+    hon = conf['relay1']['hour_on']
+    mon = conf['relay1']['min_on']
+    hof = conf['relay1']['hour_off']
+    mof = conf['relay1']['min_off']
+
+    sleep_secs = conf['sleep']
+
+    relay1_state = False
+    while True:
+        time.sleep(sleep_secs)
+        relay1_new_state = time_state(hon, mon, hof, mof)
+        dbg(f'relay1 old state: {relay1_state} new state: {relay1_new_state}')
+        if relay1_new_state != relay1_state:
+            relay1_state = relay1_new_state
+            # activate the relay
+            relay1(relay1_state)
+
