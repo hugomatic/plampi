@@ -16,8 +16,8 @@
       "relay2":
       {
         "pin": 24,
-        "minutes_on": 1,
-        "minutes_off": 2
+        "minutes_on": 15,
+        "minutes_off": 20
       }
     }
 }
