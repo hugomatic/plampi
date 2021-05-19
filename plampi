@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+
 import sys
 import os
 import time
@@ -8,14 +9,32 @@ import json
 
 import logging
 
-RELAY_1_GPIO = 23
 
-debug_mode = False
+state = {}
+state['debug_mode'] = True
 
 def dbg(s):
     global debug_mode
-    if debug_mode:
+    if state['debug_mode']:
         print(s)
+
+def delay_state(switch_time, relay_state, minutes_on, muinutes_off):
+    now = time.time()
+    dbg(f'time to switch: {switch_time - now}')
+    if now < switch_time:
+        return switch_time
+
+    if relay_state:
+        dt = 60 * conf['relays'][relay]['minutes_off']
+        dbg(f'turning off for {dt} seconds')
+        next_switch =  now + dt
+    else:
+        dt = 60 * conf['relays'][relay]['minutes_on']
+        dbg(f'turning on for {dt} seconds')
+        next_switch =  now + dt
+
+    return next_switch
+
 
 def time_state(hour_on, min_on, hour_off, min_off):
     now = datetime.datetime.now()
@@ -32,54 +51,94 @@ def time_state(hour_on, min_on, hour_off, min_off):
     dbg(f'between {hour_on}:{min_on} and {hour_off}:{min_off} ... daytime')
     return True
 
-def relay1(state):
-    print(f'{datetime.datetime.now()}: relay 1 (pin {RELAY_1_GPIO}): {state}') 
+def switch_relay(pin, state, name):
+    print(f'{datetime.datetime.now()}: {name} (pin {pin}): {state}')
     if state:
-        GPIO.output(RELAY_1_GPIO, GPIO.HIGH)
+        GPIO.output(pin, GPIO.HIGH)
     else:
-        GPIO.output(RELAY_1_GPIO, GPIO.LOW)
+        GPIO.output(pin, GPIO.LOW)
 
 
 if __name__ == "__main__":
-   
+
     print(f"""
 
 ======================================
 start plampi {datetime.datetime.now()}
 
     """)
-    
-    GPIO.setmode(GPIO.BCM) # GPIO Numbers instead of board numbers
-    GPIO.setup(RELAY_1_GPIO, GPIO.OUT) # GPIO Assign mode
 
-       
-    time.sleep(0.1)
-    # show that it works
-    relay1(True)
-    time.sleep(1)
-    relay1(False)
+    GPIO.setmode(GPIO.BCM) # GPIO Numbers instead of board numbers
 
     config_path = os.path.realpath('config.json')
     print(f'reading config: {config_path}')
     conf = None
     with open(config_path, 'r') as f:
-        conf = json.load(f) 
+        conf = json.load(f)
         print(conf)
- 
-    hon = conf['relay1']['hour_on']
-    mon = conf['relay1']['min_on']
-    hof = conf['relay1']['hour_off']
-    mof = conf['relay1']['min_off']
+
+    state['debug_mode'] = conf['debug_mode']
 
     sleep_secs = conf['sleep']
 
-    relay1_state = False
+    # prepare state
+    for relay in conf['relays']:
+        # pin is hi or low
+        cfg = {"pin": False}
+        if conf['relays'][relay].get('minutes_on'):
+            # next transition
+            cfg['switch_time'] = time.time()
+        state[relay] = cfg
+        pin_nb = conf['relays'][relay]['pin']
+        GPIO.setup(pin_nb, GPIO.OUT) # GPIO Assign mode
+        time.sleep(0.1)
+        # show that it works
+        switch_relay(pin_nb, True, relay)
+        time.sleep(1)
+        switch_relay(pin_nb, False, relay)
+
+
     while True:
         time.sleep(sleep_secs)
-        relay1_new_state = time_state(hon, mon, hof, mof)
-        dbg(f'relay1 old state: {relay1_state} new state: {relay1_new_state}')
-        if relay1_new_state != relay1_state:
-            relay1_state = relay1_new_state
-            # activate the relay
-            relay1(relay1_state)
+        for relay in conf['relays']:
+            relay_new_state =  state[relay]['pin']
+
+            # on for a while, off for a while?
+            if conf['relays'][relay].get('minutes_on'):
+                next_switch = delay_state(
+                    state[relay]['switch_time'],
+                    state[relay]['pin'],
+                    conf['relays'][relay]['minutes_on'],
+                    conf['relays'][relay]['minutes_off']
+                )
+                # the switch time has changed, change the relay state
+                if next_switch > state[relay]['switch_time']:
+                    relay_new_state = not state[relay]['pin']
+                    state[relay]['switch_time'] = next_switch
+
+
+            # is it a hour on / hour off type?
+            elif conf['relays'][relay].get('hour_on'):
+
+                relay_new_state = time_state(
+                    conf['relays'][relay]['hour_on'],
+                    conf['relays'][relay]['min_on'],
+                    conf['relays'][relay]['hour_off'],
+                    conf['relays'][relay]['min_off']
+                )
+            else:
+                raise Exception(f'relay {relay} is of unknown type')
+
+            dbg(f'{relay} old: {state[relay]["pin"]} new: {relay_new_state}')
+
+            # switch relay if state has changed
+            if relay_new_state != state[relay]['pin']:
+                # switch relay pin nb to new state
+                switch_relay(
+                  conf['relays'][relay]['pin'],
+                  relay_new_state, relay
+                )
+
+            # keep the state up to date
+            state[relay]['pin'] = relay_new_state
 

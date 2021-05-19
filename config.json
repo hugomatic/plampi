@@ -1,11 +1,24 @@
 
 {
-    "sleep": 5,  
-    "relay1": {
+    "debug_mode": false,
+    "sleep": 5,
+
+    "relays":
+    {
+      "relay1":
+      {
+        "pin": 23,
         "hour_on": 7,
         "min_on": 0,
         "hour_off": 21,
         "min_off": 0
+      },
+      "relay2":
+      {
+        "pin": 24,
+        "minutes_on": 1,
+        "minutes_off": 2
+      }
     }
 }
 
